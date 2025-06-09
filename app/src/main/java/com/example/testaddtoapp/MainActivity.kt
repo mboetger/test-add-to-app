@@ -2,6 +2,8 @@ package com.example.testaddtoapp
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Debug;
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,40 +19,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.testaddtoapp.ui.theme.TestAddToAppTheme
-import io.flutter.FlutterInjector
 import io.flutter.embedding.android.FlutterView
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.embedding.engine.dart.DartExecutor
 
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var flutterViewEngine: FlutterViewEngine
-    override fun onDestroy() {
-        super.onDestroy()
-        flutterViewEngine.detachActivity()
-    }
-
-    override fun onUserLeaveHint() {
-        flutterViewEngine.onUserLeaveHint()
-        super.onUserLeaveHint()
-    }
+    private lateinit var flutterViewEngines: FlutterViewEngines
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // TODO: create a multi-engine version after
-        // https://github.com/flutter/flutter/issues/72009 is built.
-        val engine = FlutterEngine(applicationContext)
-        engine.dartExecutor.executeDartEntrypoint(
-            DartExecutor.DartEntrypoint(
-                FlutterInjector.instance().flutterLoader().findAppBundlePath(),
-                "main"))
+        //Debug.waitForDebugger();
 
-        flutterViewEngine = FlutterViewEngine(engine)
-        // The activity and FlutterView have different lifecycles.
-        // Attach the activity right away but only start rendering when the
-        // view is also scrolled into the screen.
-        flutterViewEngine.attachToActivity(this)
+        flutterViewEngines = FlutterViewEngines(applicationContext)
+        flutterViewEngines.attachToActivity(this)
 
         setContent {
             TestAddToAppTheme {
@@ -59,7 +40,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     // Call our new list composable
-                    MyItemList(engine = engine)
+                    MyItemList(engines = flutterViewEngines)
                 }
             }
         }
@@ -68,9 +49,13 @@ class MainActivity : ComponentActivity() {
 
 // Composable function for a single item in the list
 @Composable
-fun MyListItem(context: Context, engine: FlutterEngine, itemText: String, modifier: Modifier = Modifier) {
-    var flutterView = FlutterView(context)
-    flutterView.attachToFlutterEngine(engine);
+fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier, engines: FlutterViewEngines) {
+    Log.d("MyListItem", "Creating FlutterView for $itemText")
+    var flutterView = FlutterView(context) //, itemText)
+
+    var flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
+    flutterViewEngine.attachFlutterView(flutterView)
+
     AndroidView(
         factory = { context ->
             flutterView.apply {}
@@ -81,14 +66,15 @@ fun MyListItem(context: Context, engine: FlutterEngine, itemText: String, modifi
 
 // Composable function for the list itself
 @Composable
-fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engine: FlutterEngine) {
+fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
     // Sample data for the list
-    val items = (1..20).toList();
+    val numFlutterViews = 30;
+    val items = (1..numFlutterViews).toList();
 
     LazyColumn(modifier = modifier) {
         // The 'items' block takes a list and a lambda for how to display each item
         items(items) { itemNumber ->
-            MyListItem(context = context, engine = engine, itemText = itemNumber.toString())
+            MyListItem(context = context, itemText = itemNumber.toString(), engines = engines)
         }
     }
 }

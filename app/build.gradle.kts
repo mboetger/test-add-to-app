@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.testaddtoapp"
-        minSdk = 36
+        minSdk = 31
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -27,7 +27,8 @@ android {
             ndk {
                 debugSymbolLevel = "FULL"
             }
-           packaging.jniLibs.keepDebugSymbols.add("**/*.so")
+            packaging.jniLibs.keepDebugSymbols.add("**/*.so")
+            isDebuggable = true
         }
         release {
             isMinifyEnabled = false
@@ -50,6 +51,7 @@ android {
     buildFeatures {
         compose = true
     }
+    ndkVersion = "26.1.10909125"
     configurations {
         getByName("profileImplementation") {
         }
