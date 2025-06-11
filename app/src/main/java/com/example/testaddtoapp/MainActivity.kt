@@ -6,6 +6,7 @@ import android.os.Debug;
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,26 +29,44 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //Debug.waitForDebugger();
+        Debug.waitForDebugger();
 
         flutterViewEngines = FlutterViewEngines(applicationContext)
         flutterViewEngines.attachToActivity(this)
+
 
         setContent {
             TestAddToAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
                 ) {
-                    // Call our new list composable
-                    MyItemList(engines = flutterViewEngines)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        MyStaticItem(engines = flutterViewEngines)
+                        // Call our new list composable
+                        MyItemList(engines = flutterViewEngines)
+                    }
                 }
             }
         }
     }
 }
 
-// Composable function for a single item in the list
+@Composable
+fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEngines) {
+    var flutterView = FlutterView(context) //, itemText)
+
+    var flutterViewEngine = engines.createAndRunEngine("static", listOf());
+    flutterViewEngine.attachFlutterView(flutterView)
+
+    AndroidView(
+        factory = { context ->
+            flutterView.apply {}
+        },
+        modifier = Modifier.padding(16.dp).height(300.dp),
+    )
+}
+
 @Composable
 fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier, engines: FlutterViewEngines) {
     Log.d("MyListItem", "Creating FlutterView for $itemText")
