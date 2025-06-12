@@ -5,10 +5,13 @@ import android.os.Bundle
 import android.os.Debug;
 import android.util.Log
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -38,8 +42,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import com.example.testaddtoapp.ui.theme.TestAddToAppTheme
+import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.android.FlutterView
+import io.flutter.embedding.android.RenderMode
+import io.flutter.embedding.android.TransparencyMode
 
 enum class LayoutType {
     FLUTTER,
@@ -91,25 +99,25 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when (currentLayout) {
                         LayoutType.MIX_FLUTTER_TOP -> {
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
                                 MyStaticItem(engines = flutterViewEngines)
                                 MyItemList2(engines = flutterViewEngines)
                             }
                         }
                         LayoutType.MIX -> {
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
                                 MyStaticItem2()
                                 MyItemList(engines = flutterViewEngines)
                             }
                         }
                         LayoutType.FLUTTER -> {
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
                                 MyStaticItem(engines = flutterViewEngines)
                                 MyItemList(engines = flutterViewEngines)
                             }
                         }
                         LayoutType.NO_FLUTTER -> {
-                            Column(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
                                 MyStaticItem2()
                                 // MyStaticItem(engines = flutterViewEngines)
                                 // Call our new list composable
@@ -130,24 +138,32 @@ fun MyStaticItem2(/* context: Context = LocalContext.current, engines: FlutterVi
 
     AndroidView(
         factory = { context ->
-            TextView(context).apply {
-                text = "Static Item"
-                textSize = 24f
+            FrameLayout(context).apply {
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
         },
         modifier = Modifier
             .padding(16.dp)
             .fillMaxWidth()
             .height(300.dp)
-            .background(Color.Cyan),
+            .zIndex(-1f)
     )
 }
 
 @Composable
 fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEngines) {
-    var flutterView = FlutterView(context) //, itemText)
+    // Fixes https://github.com/flutter/flutter/issues/169295
+    var flutterSurfaceView = FlutterSurfaceView(context)
+    flutterSurfaceView.setZOrderOnTop(true)
+    var flutterView = FlutterView(context, flutterSurfaceView)
 
-    var flutterViewEngine = engines.createAndRunEngine("static", listOf());
+    // Deprecated API to fix https://github.com/flutter/flutter/issues/169295
+    //var flutterView = FlutterView(context, RenderMode.surface, TransparencyMode.transparent)
+
+    // Causes https://github.com/flutter/flutter/issues/169295
+    //var flutterView = FlutterView(context)
+
+    var flutterViewEngine = engines.createAndRunEngine("static", listOf())
     flutterViewEngine.attachFlutterView(flutterView)
 
     AndroidView(
@@ -157,7 +173,9 @@ fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEn
         modifier = Modifier
             .padding(16.dp)
             .height(300.dp)
-            .background(Color.Cyan),
+            .background(Color.Cyan)
+            .zIndex(100f)
+
     )
 }
 
@@ -171,22 +189,21 @@ fun MyListItem2(
 
     AndroidView(
         factory = { context ->
-            TextView(context).apply {
-                text = "List Item"
+            ImageView(context).apply {
+                setImageResource(R.drawable.ic_launcher_background)
             }
         },
         modifier = Modifier
             .padding(16.dp)
-            .fillMaxWidth()
+            .fillMaxSize()
             .height(300.dp)
-            .background(Color.LightGray),
     )
 }
 
 @Composable
 fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier, engines: FlutterViewEngines) {
     Log.d("MyListItem", "Creating FlutterView for $itemText")
-    var flutterView = FlutterView(context) //, itemText)
+    var flutterView = FlutterView(context)
 
     var flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
     flutterViewEngine.attachFlutterView(flutterView)
