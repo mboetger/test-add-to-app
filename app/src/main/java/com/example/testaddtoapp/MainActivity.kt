@@ -152,15 +152,15 @@ fun MyStaticItem2(/* context: Context = LocalContext.current, engines: FlutterVi
 @Composable
 fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEngines) {
     // Fixes https://github.com/flutter/flutter/issues/169295
-    //var flutterSurfaceView = FlutterSurfaceView(context)
-    //flutterSurfaceView.setZOrderOnTop(true)
-    //var flutterView = FlutterView(context, flutterSurfaceView)
+    var flutterSurfaceView = FlutterSurfaceView(context)
+    flutterSurfaceView.setZOrderOnTop(true)
+    var flutterView = FlutterView(context, flutterSurfaceView)
 
     // Deprecated API to fix https://github.com/flutter/flutter/issues/169295
-    //var flutterView = FlutterView(context, RenderMode.surface, TransparencyMode.transparent)
+    // var flutterView = FlutterView(context, RenderMode.surface, TransparencyMode.transparent)
 
     // Causes https://github.com/flutter/flutter/issues/169295
-    var flutterView = FlutterView(context)
+    // var flutterView = FlutterView(context)
 
     var flutterViewEngine = engines.createAndRunEngine("static", listOf())
     flutterViewEngine.attachFlutterView(flutterView)
@@ -171,7 +171,6 @@ fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEn
         },
         modifier = Modifier
             .padding(16.dp)
-            .height(300.dp)
             .background(Color.Cyan)
             .zIndex(100f)
 
