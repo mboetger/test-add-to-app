@@ -2,62 +2,89 @@ package com.example.testaddtoapp
 
 import android.content.Context
 import android.os.Bundle
-import android.os.Debug;
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.TextView
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import com.example.testaddtoapp.ui.theme.TestAddToAppTheme
-import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.android.FlutterView
-import io.flutter.embedding.android.RenderMode
-import io.flutter.embedding.android.TransparencyMode
-
-enum class LayoutType {
-    FLUTTER,
-    NO_FLUTTER,
-    MIX,
-    MIX_FLUTTER_TOP
-}
+import androidx.core.view.isVisible
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var flutterViewEngines: FlutterViewEngines
+    private var scrollingFlutterView: FlutterView? = null
+
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        Log.d("MainActivity", "dispatchTouchEvent: $ev")
+        if (ev != null) {
+            val action = when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> "ACTION_DOWN"
+                MotionEvent.ACTION_MOVE -> "ACTION_MOVE"
+                MotionEvent.ACTION_UP -> "ACTION_UP"
+                MotionEvent.ACTION_CANCEL -> "ACTION_CANCEL"
+                MotionEvent.ACTION_POINTER_DOWN -> "ACTION_POINTER_DOWN"
+                MotionEvent.ACTION_POINTER_UP -> "ACTION_POINTER_UP"
+                else -> "OTHER (${ev.actionMasked})"
+            }
+            Log.d(
+                "MainActivityTouch",
+                "dispatchTouchEvent: Action: $action, X: ${ev.x}, Y: ${ev.y}, RawX: ${ev.rawX}, RawY: ${ev.rawY}"
+            )
+
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+                val touchX = ev.rawX // Use rawX/rawY for global screen coordinates
+                val touchY = ev.rawY
+                // Find the root view of your activity; all FlutterViews will be descendants
+                val rootView = window.decorView.rootView
+                scrollingFlutterView = findFlutterViewUnderTouchIterative(rootView, touchX, touchY)
+            }
+
+            if (scrollingFlutterView != null) {
+                // Now you have the FlutterView instance.
+                // You might need to find its associated data/engine if you mapped them.
+                // For instance, if you stored them in the view's tag:
+                // val itemIdentifier = flutterViewUnderTouch.tag as? String
+                // Log.d("MainActivityTouch", "FlutterView found under touch! Identifier: $itemIdentifier")
+
+                Log.d(
+                    "MainActivityTouch",
+                    "FlutterView found under touch! Instance: $scrollingFlutterView"
+                )
+
+                // TODO: What do you want to do with this FlutterView?
+                // - Pass the event to it specifically? (Compose usually handles this)
+                // - Trigger some action based on which one was touched?
+                if (scrollingFlutterView?.onTouchEvent(ev) == true) {
+                    return true;
+                }
+                Log.d("MainActivityTouch", "flutterViewUnderTouch.onTouchEvent returned false")
+            } else {
+                Log.d("MainActivityTouch", "No FlutterView found directly under touch.")
+            }
+        }
+        Log.d("MainActivityTouch", "dispatchTouchEvent: returning false")
+        // To let the event propagate normally (including to Compose content):
+        return super.dispatchTouchEvent(ev)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,180 +96,120 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TestAddToAppTheme {
-                // A state variable to hold the current layout type
-                var currentLayout by remember { mutableStateOf(LayoutType.NO_FLUTTER) }
-
-                Scaffold(
-                    floatingActionButton = {
-                        FloatingActionButton(onClick = {
-                            // Toggle the layout type
-                            currentLayout = if (currentLayout == LayoutType.NO_FLUTTER) {
-                                LayoutType.FLUTTER
-                            } else if (currentLayout == LayoutType.FLUTTER) {
-                                LayoutType.MIX
-                            } else if (currentLayout == LayoutType.MIX){
-                                LayoutType.MIX_FLUTTER_TOP
-                            } else {
-                                LayoutType.NO_FLUTTER
-                            }
-                            Log.d("FAB", "Layout changed to: $currentLayout")
-                        }) {
-                            Icon(Icons.Filled.Refresh, "Change Layout") // Icon for the FAB
-                        }
-                    },
-                    floatingActionButtonPosition = FabPosition.End
-                ) { innerPadding ->
                 Surface(
-                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    when (currentLayout) {
-                        LayoutType.MIX_FLUTTER_TOP -> {
-                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
-                                MyStaticItem(engines = flutterViewEngines)
-                                MyItemList2(engines = flutterViewEngines)
-                            }
-                        }
-                        LayoutType.MIX -> {
-                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
-                                MyStaticItem2()
-                                MyItemList(engines = flutterViewEngines)
-                            }
-                        }
-                        LayoutType.FLUTTER -> {
-                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
-                                MyStaticItem(engines = flutterViewEngines)
-                                MyItemList(engines = flutterViewEngines)
-                            }
-                        }
-                        LayoutType.NO_FLUTTER -> {
-                            Column(modifier = Modifier.fillMaxSize().background(Color.Yellow)) {
-                                MyStaticItem2()
-                                // MyStaticItem(engines = flutterViewEngines)
-                                // Call our new list composable
-                                MyItemList2(engines = flutterViewEngines)
-                            }
-                        }
+                    Column(modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Yellow)) {
+                        //MyStaticItem2()
+                        MyItemList(engines = flutterViewEngines)
                     }
                 }
             }
-            }
         }
     }
-}
 
-@Composable
-fun MyStaticItem2(/* context: Context = LocalContext.current, engines: FlutterViewEngines */) {
-    Log.d("MyStaticItem", "Creating static item with colored background")
+    private fun findFlutterViewUnderTouchIterative(
+        rootView: View,
+        screenTouchX: Float,
+        screenTouchY: Float
+    ): FlutterView? {
+        val viewsToCheck: java.util.Queue<View> = java.util.ArrayDeque()
+        viewsToCheck.offer(rootView)
+        var foundFlutterView: FlutterView? = null
 
-    AndroidView(
-        factory = { context ->
-            FrameLayout(context).apply {
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        Log.d("HitTestDebug", "----------------------------------------------------")
+        Log.d("HitTestDebug", "Searching for view at screenX: $screenTouchX, screenY: $screenTouchY")
+
+        while (viewsToCheck.isNotEmpty()) {
+            val currentView = viewsToCheck.poll() ?: continue
+
+            // Optional: Log all views being checked if needed, but can be verbose
+            // Log.d("HitTestDebug", "Checking view: ${currentView.javaClass.simpleName}, ID: ${currentView.id}")
+
+            if (currentView is FlutterView) {
+                val globalVisibleRect = android.graphics.Rect()
+                val isActuallyVisibleOnScreen = currentView.getGlobalVisibleRect(globalVisibleRect)
+                // Also get location on screen for comparison, though globalVisibleRect is better for hit-testing
+                val location = IntArray(2)
+                currentView.getLocationOnScreen(location)
+
+                Log.d("HitTestDebug", "Found FlutterView instance: $currentView")
+                Log.d("HitTestDebug", "  - IsVisible (View.isVisible): ${currentView.isVisible}")
+                Log.d("HitTestDebug", "  - IsActuallyVisibleOnScreen (getGlobalVisibleRect): $isActuallyVisibleOnScreen")
+                Log.d("HitTestDebug", "  - GlobalVisibleRect: $globalVisibleRect")
+                Log.d("HitTestDebug", "  - LocationOnScreen: [${location[0]}, ${location[1]}] (width: ${currentView.width}, height: ${currentView.height})")
+
+                if (currentView.isVisible && isActuallyVisibleOnScreen) {
+                    val containsTouch = globalVisibleRect.contains(screenTouchX.toInt(), screenTouchY.toInt())
+                    Log.d("HitTestDebug", "  - GlobalVisibleRect.contains(touch): $containsTouch")
+                    if (containsTouch) {
+                        Log.d("HitTestDebug", "  >>> MATCH! Returning this FlutterView.")
+                        foundFlutterView = currentView
+                        break
+                    }
+                } else {
+                    Log.d("HitTestDebug", "  - View is not visible or not on screen.")
+                }
             }
-        },
-        modifier = Modifier
-            .padding(16.dp)
-            .fillMaxWidth()
-            .height(300.dp)
-            .zIndex(-1f)
-    )
-}
 
-@Composable
-fun MyStaticItem(context: Context = LocalContext.current, engines: FlutterViewEngines) {
-    // Fixes https://github.com/flutter/flutter/issues/169295
-    //var flutterSurfaceView = FlutterSurfaceView(context)
-    //flutterSurfaceView.setZOrderOnTop(true)
-    //var flutterView = FlutterView(context, flutterSurfaceView)
-
-    // Deprecated API to fix https://github.com/flutter/flutter/issues/169295
-    //var flutterView = FlutterView(context, RenderMode.surface, TransparencyMode.transparent)
-
-    // Causes https://github.com/flutter/flutter/issues/169295
-    var flutterView = FlutterView(context)
-
-    var flutterViewEngine = engines.createAndRunEngine("static", listOf())
-    flutterViewEngine.attachFlutterView(flutterView)
-
-    AndroidView(
-        factory = { context ->
-            flutterView.apply {}
-        },
-        modifier = Modifier
-            .padding(16.dp)
-            .height(300.dp)
-            .background(Color.Cyan)
-            .zIndex(100f)
-
-    )
-}
-
-@Composable
-fun MyListItem2(
-    itemText: String,
-    modifier: Modifier = Modifier,
-    /* context: Context = LocalContext.current, engines: FlutterViewEngines */
-) {
-    Log.d("MyListItem", "Creating list item $itemText with colored background")
-
-    AndroidView(
-        factory = { context ->
-            ImageView(context).apply {
-                setImageResource(R.drawable.ic_launcher_background)
+            if (currentView is ViewGroup) {
+                for (i in 0 until currentView.childCount) {
+                    currentView.getChildAt(i)?.let { child ->
+                        viewsToCheck.offer(child)
+                    }
+                }
             }
-        },
-        modifier = Modifier
-            .padding(16.dp)
-            .fillMaxWidth()
-            .height(300.dp)
-    )
-}
-
-@Composable
-fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier, engines: FlutterViewEngines) {
-    Log.d("MyListItem", "Creating FlutterView for $itemText")
-    var flutterView = FlutterView(context)
-
-    var flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
-    flutterViewEngine.attachFlutterView(flutterView)
-
-    AndroidView(
-        factory = { context ->
-            flutterView.apply {}
-        },
-        modifier = Modifier
-            .padding(16.dp)
-            .height(300.dp)
-            .background(Color.LightGray),
-    )
-}
-
-// Composable function for the list itself
-@Composable
-fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
-    // Sample data for the list
-    val numFlutterViews = 30;
-    val items = (1..numFlutterViews).toList();
-
-    LazyColumn(modifier = modifier) {
-        // The 'items' block takes a list and a lambda for how to display each item
-        items(items) { itemNumber ->
-            MyListItem(context = context, itemText = itemNumber.toString(), engines = engines)
         }
+        if (foundFlutterView == null) {
+            Log.d("HitTestDebug", "No FlutterView found matching coordinates.")
+        }
+        Log.d("HitTestDebug", "----------------------------------------------------")
+        return foundFlutterView
     }
-}
 
-@Composable
-fun MyItemList2(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
-    // Sample data for the list
-    val numFlutterViews = 30;
-    val items = (1..numFlutterViews).toList();
+    @Composable
+    fun MyListItem(
+        context: Context,
+        itemText: String,
+        modifier: Modifier = Modifier,
+        engines: FlutterViewEngines
+    ) {
+        Log.d("MyListItem", "Creating FlutterView for $itemText")
+        var flutterView = FlutterView(context)
 
-    LazyColumn(modifier = modifier) {
-        // The 'items' block takes a list and a lambda for how to display each item
-        items(items) { itemNumber ->
-            MyListItem2(itemText = itemNumber.toString())
+        var flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
+        flutterViewEngine.attachFlutterView(flutterView)
+
+        AndroidView(
+            factory = { context ->
+                flutterView.apply {}
+            },
+            modifier = Modifier
+                .padding(16.dp)
+                .height(400.dp)
+                .background(Color.LightGray),
+        )
+    }
+
+    // Composable function for the list itself
+    @Composable
+    fun MyItemList(
+        modifier: Modifier = Modifier,
+        context: Context = LocalContext.current,
+        engines: FlutterViewEngines
+    ) {
+        // Sample data for the list
+        val numFlutterViews = 30;
+        val items = (1..numFlutterViews).toList();
+
+        LazyColumn(modifier = modifier) {
+            // The 'items' block takes a list and a lambda for how to display each item
+            items(items) { itemNumber ->
+                MyListItem(context = context, itemText = itemNumber.toString(), engines = engines)
+            }
         }
     }
 }
