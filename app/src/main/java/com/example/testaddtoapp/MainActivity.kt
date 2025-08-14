@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -26,116 +28,160 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.example.testaddtoapp.ui.theme.TestAddToAppTheme
 import io.flutter.embedding.android.FlutterView
 import androidx.core.view.isVisible
+import java.util.concurrent.ConcurrentHashMap
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var flutterViewEngines: FlutterViewEngines
-    private var scrollingFlutterView: FlutterView? = null
 
+    // To identify which FlutterView is which, we need to map FlutterView instances to their instanceIds
+    // This is populated when FlutterViews are created/attached.
+    private val flutterViewInstanceMap = ConcurrentHashMap<FlutterView, String>()
+
+    var scrollingFlutterView: FlutterView? = null
+
+    // Variables to store previous touch coordinates for delta calculation (for the primary pointer)
+    private var lastTouchX: Float = 0f
+    private var lastTouchY: Float = 0f
+    private var isTrackingTouchDelta = false // Flag to indicate if we have a valid lastTouchX/Y
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        Log.d("MainActivity", "dispatchTouchEvent: $ev")
-        if (ev != null) {
-            val action = when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> "ACTION_DOWN"
-                MotionEvent.ACTION_MOVE -> "ACTION_MOVE"
-                MotionEvent.ACTION_UP -> "ACTION_UP"
-                MotionEvent.ACTION_CANCEL -> "ACTION_CANCEL"
-                MotionEvent.ACTION_POINTER_DOWN -> "ACTION_POINTER_DOWN"
-                MotionEvent.ACTION_POINTER_UP -> "ACTION_POINTER_UP"
-                else -> "OTHER (${ev.actionMasked})"
-            }
-            Log.d(
-                "MainActivityTouch",
-                "dispatchTouchEvent: Action: $action, X: ${ev.x}, Y: ${ev.y}, RawX: ${ev.rawX}, RawY: ${ev.rawY}"
-            )
+        if (ev == null) return super.dispatchTouchEvent(ev)
+        val action = ev.actionMasked
+        // For multi-touch, you might want to get the specific pointer index:
+        // val pointerIndex = ev.actionIndex
 
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-                val touchX = ev.rawX // Use rawX/rawY for global screen coordinates
-                val touchY = ev.rawY
-                Log.v("MainActivityTouch", "dispatchTouchEvent: touchX: $touchX, touchY: $touchY")
-                // Find the root view of your activity; all FlutterViews will be descendants
+        // Current coordinates for the primary pointer (index 0)
+        // If handling multiple pointers, loop through ev.pointerCount and use ev.getX(i), ev.getY(i)
+        val currentX = ev.x // Relative to the view dispatching this event (Activity's DecorView)
+        val currentY = ev.y
+        var deltaY = 0f
+
+        when (action) {
+            MotionEvent.ACTION_DOWN -> {
+                Log.d("MainActivityTouch", "ACTION_DOWN at X: $currentX, Y: $currentY")
+                lastTouchX = currentX
+                lastTouchY = currentY
+                isTrackingTouchDelta = true // Start tracking for delta
+
+                // Your existing logic to find scrollingFlutterView
+                val touchRawX = ev.rawX
+                val touchRawY = ev.rawY
                 val rootView = window.decorView.rootView
-                scrollingFlutterView = findFlutterViewUnderTouchIterative(rootView, touchX, touchY)
+                scrollingFlutterView = findFlutterViewUnderTouchIterative(rootView, touchRawX, touchRawY)
             }
 
-            if (scrollingFlutterView != null) {
-                Log.d(
-                    "MainActivityTouch",
-                    "FlutterView found under touch! Instance: $scrollingFlutterView"
-                )
+            MotionEvent.ACTION_MOVE -> {
+                if (isTrackingTouchDelta) {
+                    deltaY = currentY - lastTouchY
+                    Log.d("MainActivityTouch", "ACTION_MOVE - DeltaY: $deltaY (Current: $currentX, $currentY, Last: $lastTouchX, $lastTouchY)")
 
-                // Get FlutterView's location on screen
-                val flutterViewLocation = IntArray(2)
-                scrollingFlutterView!!.getLocationOnScreen(flutterViewLocation)
-                val flutterViewScreenX = flutterViewLocation[0]
-                val flutterViewScreenY = flutterViewLocation[1]
-
-                // Get the raw (absolute) screen coordinates of the touch event
-                val rawTouchX = ev.rawX
-                val rawTouchY = ev.rawY
-
-                // Translate to coordinates relative to the FlutterView
-                val relativeX = rawTouchX - flutterViewScreenX
-                val relativeY = rawTouchY - flutterViewScreenY
-
-                Log.d(
-                    "MainActivityTouch",
-                    "MotionEvent rawX: ${ev.rawX}, rawY: ${ev.rawY}"
-                )
-                Log.d(
-                    "MainActivityTouch",
-                    "FlutterView screenX: $flutterViewScreenX, screenY: $flutterViewScreenY"
-                )
-                Log.d(
-                    "MainActivityTouch",
-                    "Touch relative to FlutterView: X: $relativeX, Y: $relativeY"
-                )
-
-                // Now, if you need to create a new MotionEvent to forward to Flutter
-                // (e.g., if you're not using FlutterView.onTouchEvent directly or
-                // need to modify the event), you can use these relative coordinates.
-
-                // Create a new MotionEvent with coordinates relative to the FlutterView
-                // Note: You might need to offset by ev.getX() - ev.getRawX() if you were
-                // to use ev.getX/Y directly, but it's simpler to use rawX/Y and subtract.
-                val newEvent = MotionEvent.obtain(
-                    ev.downTime,
-                    ev.eventTime,
-                    ev.action,
-                    relativeX, // Use the translated X
-                    relativeY, // Use the translated Y
-                    ev.pressure,
-                    ev.size,
-                    ev.metaState,
-                    ev.xPrecision,
-                    ev.yPrecision,
-                    ev.deviceId,
-                    ev.edgeFlags
-                )
-
-
-                // If you are using Flutter's AndroidViewController to send events,
-                // you would use these relative coordinates when constructing an AndroidMotionEvent.
-                // For example (conceptual, as direct sending like this is less common with FlutterView):
-                // val androidMotionEvent = AndroidMotionEvent.obtain(newEvent, 0 /* deviceId */)
-                // flutterEngine.renderer.dispatchPointerDataPacket(androidMotionEvent.rawPointerCoords, androidMotionEvent.pointerProperties);
-                // androidMotionEvent.recycle();
-
-                // The most straightforward way, if FlutterView.onTouchEvent handles it correctly:
-                if (scrollingFlutterView?.onTouchEvent(newEvent) == true) { // Pass the NEW event
-                    newEvent.recycle() // Important: recycle MotionEvents you obtain
-                    return true
+                    // Update last touch coordinates for the next MOVE event
+                    lastTouchX = currentX
+                    lastTouchY = currentY
+                } else {
+                    // This can happen if MOVE events are received without a preceding DOWN
+                    // (e.g., if another view intercepted DOWN but released for MOVE).
+                    // Initialize here if needed, or ignore.
+                    lastTouchX = currentX
+                    lastTouchY = currentY
+                    isTrackingTouchDelta = true
+                    Log.d("MainActivityTouch", "ACTION_MOVE - Initializing tracking at X: $currentX, Y: $currentY")
                 }
-                newEvent.recycle() // Recycle if not handled
+            }
 
-                Log.d("MainActivityTouch", "flutterViewUnderTouch.onTouchEvent returned false")
-            } else {
-                Log.d("MainActivityTouch", "No FlutterView found directly under touch.")
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                Log.d("MainActivityTouch", "ACTION_UP or ACTION_CANCEL. Resetting delta tracking.")
+                isTrackingTouchDelta = false // Stop tracking delta
+                // scrollingFlutterView will be cleared later
             }
         }
-        Log.d("MainActivityTouch", "dispatchTouchEvent: returning false")
-        // To let the event propagate normally (including to Compose content):
+
+
+        if (scrollingFlutterView == null) return super.dispatchTouchEvent(ev)
+        val instanceId = flutterViewInstanceMap[scrollingFlutterView]
+
+        if (instanceId == null) return super.dispatchTouchEvent(ev)
+        val scrollState = flutterInstanceScrollStates[instanceId];
+
+        Log.d(
+            "MainActivityTouch",
+            "FlutterView found under touch! Instance: ${scrollingFlutterView.hashCode()} & $instanceId & $scrollState"
+        )
+
+        val forwardToFlutter = if (action == MotionEvent.ACTION_MOVE) {
+            when(scrollState) {
+                "atTop" -> deltaY < 0
+                "atMiddle" -> true
+                "atBottom" -> deltaY > 0
+                else -> false
+            }
+        } else {
+            true
+        }
+
+        if (!forwardToFlutter) {
+            Log.d("MainActivityTouch", "Not forwarding to FlutterView")
+            return super.dispatchTouchEvent(ev)
+        }
+
+        Log.d("MainActivityTouch", "Forwarding to FlutterView")
+
+        // Get FlutterView's location on screen
+        val flutterViewLocation = IntArray(2)
+        scrollingFlutterView!!.getLocationOnScreen(flutterViewLocation)
+        val flutterViewScreenX = flutterViewLocation[0]
+        val flutterViewScreenY = flutterViewLocation[1]
+
+        // Get the raw (absolute) screen coordinates of the touch event
+        val rawTouchX = ev.rawX
+        val rawTouchY = ev.rawY
+
+        // Translate to coordinates relative to the FlutterView
+        val relativeX = rawTouchX - flutterViewScreenX
+        val relativeY = rawTouchY - flutterViewScreenY
+        // Now, if you need to create a new MotionEvent to forward to Flutter
+        // (e.g., if you're not using FlutterView.onTouchEvent directly or
+        // need to modify the event), you can use these relative coordinates.
+
+        // Create a new MotionEvent with coordinates relative to the FlutterView
+        // Note: You might need to offset by ev.getX() - ev.getRawX() if you were
+        // to use ev.getX/Y directly, but it's simpler to use rawX/Y and subtract.
+        val newEvent = MotionEvent.obtain(
+            ev.downTime,
+            ev.eventTime,
+            ev.action,
+            relativeX, // Use the translated X
+            relativeY, // Use the translated Y
+            ev.pressure,
+            ev.size,
+            ev.metaState,
+            ev.xPrecision,
+            ev.yPrecision,
+            ev.deviceId,
+            ev.edgeFlags
+        )
+
+
+        // If you are using Flutter's AndroidViewController to send events,
+        // you would use these relative coordinates when constructing an AndroidMotionEvent.
+        // For example (conceptual, as direct sending like this is less common with FlutterView):
+        // val androidMotionEvent = AndroidMotionEvent.obtain(newEvent, 0 /* deviceId */)
+        // flutterEngine.renderer.dispatchPointerDataPacket(androidMotionEvent.rawPointerCoords, androidMotionEvent.pointerProperties);
+        // androidMotionEvent.recycle();
+
+        // The most straightforward way, if FlutterView.onTouchEvent handles it correctly:
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (scrollingFlutterView?.onTouchEvent(newEvent) == true) { // Pass the NEW event
+                newEvent.recycle() // Important: recycle MotionEvents you obtain
+                return true
+            }
+        } else {
+            // Other actions need to go to both if we want the Android scroll to work properly
+            val result = super.dispatchTouchEvent(ev) && scrollingFlutterView?.onTouchEvent(newEvent) == true
+            newEvent.recycle() // Recycle if not handled
+            return result
+        }
         return super.dispatchTouchEvent(ev)
     }
 
@@ -179,9 +225,6 @@ class MainActivity : ComponentActivity() {
         while (viewsToCheck.isNotEmpty()) {
             val currentView = viewsToCheck.poll() ?: continue
 
-            // Optional: Log all views being checked if needed, but can be verbose
-            // Log.d("HitTestDebug", "Checking view: ${currentView.javaClass.simpleName}, ID: ${currentView.id}")
-
             if (currentView is FlutterView) {
                 val globalVisibleRect = android.graphics.Rect()
                 val isActuallyVisibleOnScreen = currentView.getGlobalVisibleRect(globalVisibleRect)
@@ -189,15 +232,8 @@ class MainActivity : ComponentActivity() {
                 val location = IntArray(2)
                 currentView.getLocationOnScreen(location)
 
-                Log.d("HitTestDebug", "Found FlutterView instance: $currentView")
-                Log.d("HitTestDebug", "  - IsVisible (View.isVisible): ${currentView.isVisible}")
-                Log.d("HitTestDebug", "  - IsActuallyVisibleOnScreen (getGlobalVisibleRect): $isActuallyVisibleOnScreen")
-                Log.d("HitTestDebug", "  - GlobalVisibleRect: $globalVisibleRect")
-                Log.d("HitTestDebug", "  - LocationOnScreen: [${location[0]}, ${location[1]}] (width: ${currentView.width}, height: ${currentView.height})")
-
                 if (currentView.isVisible && isActuallyVisibleOnScreen) {
                     val containsTouch = globalVisibleRect.contains(screenTouchX.toInt(), screenTouchY.toInt())
-                    Log.d("HitTestDebug", "  - GlobalVisibleRect.contains(touch): $containsTouch")
                     if (containsTouch) {
                         Log.d("HitTestDebug", "  >>> MATCH! Returning this FlutterView.")
                         foundFlutterView = currentView
@@ -231,16 +267,27 @@ class MainActivity : ComponentActivity() {
         engines: FlutterViewEngines
     ) {
         Log.d("MyListItem", "Creating FlutterView for $itemText")
-        var flutterView = FlutterView(context)
+        val flutterView = FlutterView(context)
 
-        var flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
+        val flutterViewEngine = engines.createAndRunEngine(itemText, listOf());
         flutterViewEngine.attachFlutterView(flutterView)
+
+        flutterViewInstanceMap[flutterView] = itemText // Associate instance with ID
+
+        // Ensure cleanup when the composable is disposed
+        DisposableEffect(flutterView) {
+            onDispose {
+                Log.d("MyListItem", "Disposing FlutterView ${flutterView.hashCode()} for ID $itemText. Removing from map.")
+                flutterViewInstanceMap.remove(flutterView)
+            }
+        }
+
 
         AndroidView(
             factory = { context ->
                 flutterView.apply {}
             },
-            modifier = Modifier
+            modifier = modifier
                 .padding(16.dp)
                 .height(400.dp)
                 .background(Color.LightGray),
@@ -263,6 +310,21 @@ class MainActivity : ComponentActivity() {
             items(items) { itemNumber ->
                 MyListItem(context = context, itemText = itemNumber.toString(), engines = engines)
             }
+        }
+    }
+
+    companion object {
+        // Thread-safe map to store scroll states from Flutter
+        // Key: instanceId (String), Value: scrollState (String, e.g., "atTop", "atMiddle", "atBottom")
+        private val flutterInstanceScrollStates = ConcurrentHashMap<String, String>()
+
+        fun staticHandleScrollState(instanceId: String, state: String) {
+            Log.i("MainActivity", "Static Handler: Scroll state for instance '$instanceId' is '$state'")
+            flutterInstanceScrollStates[instanceId] = state
+        }
+
+        fun getScrollStateForInstance(instanceId: String): String? {
+            return flutterInstanceScrollStates[instanceId]
         }
     }
 }
