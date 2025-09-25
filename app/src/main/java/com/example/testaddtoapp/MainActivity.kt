@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
@@ -55,28 +56,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier, engines: FlutterViewEngines) {
     Log.d("MyListItem", "Creating FlutterView for $itemText")
-    val flutterView = FlutterView(context)
     // Create and remember the engine so it's not recreated on recomposition.
     val flutterViewEngine = remember(itemText) {
         engines.createAndRunEngine(itemText, listOf())
     }
-
     AndroidView(
         factory = { context ->
-            flutterView.apply {
-            }
+            FlutterView(context)
         },
-        update = {
-            // FlutterView must be attached after inflating
+        update = { flutterView ->
+            Log.d("MyListItem", "Update: Attaching engine to view for $itemText")
             flutterViewEngine.attachFlutterView(flutterView)
-        },
-        onRelease = {
-            flutterViewEngine.detachFlutterView(flutterView)
         },
         modifier = modifier
             .padding(16.dp)
             .wrapContentHeight()
             .defaultMinSize(minHeight = 1.dp)
+            .fillMaxWidth()
             .background(Color.LightGray),
     )
 }
@@ -85,7 +81,7 @@ fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier
 @Composable
 fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
     // Sample data for the list
-    val numFlutterViews = 1
+    val numFlutterViews = 25
     val items = (1..numFlutterViews).toList()
 
     LazyColumn(modifier = modifier) {
