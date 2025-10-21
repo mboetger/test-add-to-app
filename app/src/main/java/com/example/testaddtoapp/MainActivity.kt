@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +79,7 @@ fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier
 @Composable
 fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
     // Sample data for the list
-    val numFlutterViews = 25
+    val numFlutterViews = 3
     val items = (1..numFlutterViews).toList()
 
     LazyColumn(modifier = modifier) {
