@@ -69,7 +69,6 @@ fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier
         modifier = modifier
             .padding(16.dp)
             .wrapContentHeight()
-            .defaultMinSize(minHeight = 1.dp)
             .fillMaxWidth()
             .background(Color.LightGray),
     )
@@ -79,7 +78,7 @@ fun MyListItem(context: Context, itemText: String, modifier: Modifier = Modifier
 @Composable
 fun MyItemList(modifier: Modifier = Modifier, context: Context = LocalContext.current, engines: FlutterViewEngines) {
     // Sample data for the list
-    val numFlutterViews = 3
+    val numFlutterViews = 1
     val items = (1..numFlutterViews).toList()
 
     LazyColumn(modifier = modifier) {
