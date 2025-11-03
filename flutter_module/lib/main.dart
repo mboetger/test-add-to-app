@@ -1,14 +1,80 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
-const String text = '''
-Hello world.
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum facilisis vel quam nec scelerisque. Nullam leo sapien, ornare blandit dui ac, varius condimentum leo. Vestibulum quis sem vulputate, varius dui nec, malesuada sem. Aliquam tincidunt pretium dolor, quis ullamcorper nunc consequat quis. Donec at dui in ex pharetra pretium. Quisque molestie massa vel tellus scelerisque feugiat. Ut sed consectetur neque.''';
-
 void main() {
-  final random = Random();
-  // nextInt(4) generates a number from 0-3. Add 1 to get a range of 1-4.
-  final numTexts = random.nextInt(4) + 1;
-  runApp(Text(text * numTexts, textDirection: TextDirection.ltr));
+  runApp(const MyApp());
+}
+
+/// The main application widget for the Fruit Catalog.
+class MyApp extends StatefulWidget {
+  /// Creates the [MyApp].
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  int _counter = 1;
+  void _incrementCounter() {
+    setState(() {
+      // This call to setState tells the Flutter framework that something has
+      // changed in this State, which causes it to rerun the build method below
+      // so that the display can reflect the updated values. If we changed
+      // _counter without calling setState(), then the build method would not be
+      // called again, and so nothing would appear to happen.
+      if (_counter > 40) {
+        _counter = 1;
+      }
+      _counter++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // return Text(
+    //   "Hello from Flutter",
+    //   textDirection: TextDirection.ltr,
+    //   style: TextStyle(color: Colors.pink),
+    // );
+    // return const Center(
+    //   heightFactor: 1,
+    //   child: Text(
+    //     "Hello from Flutter",
+    //     textDirection: TextDirection.ltr,
+    //     style: TextStyle(color: Colors.pink),
+    //   ),
+    // );
+
+    return Center(
+      heightFactor: 1,
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8.0, 50, 8.0, 8.0),
+              child: ElevatedButton(
+                onPressed: _incrementCounter,
+                child: Text("Add to list"),
+                // style: ButtonStyle(
+                //   splashFactory:
+                //       NoSplash.splashFactory, // Removes the ripple effect
+                //   overlayColor: MaterialStateProperty.all(
+                //     Colors.transparent,
+                //   ), // Removes hover/press overlay
+                // ),
+              ),
+            ),
+            for (int i = 0; i < _counter; i++)
+              Text(
+                "Hello from Flutter $i",
+                style: TextStyle(color: Colors.pink),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
